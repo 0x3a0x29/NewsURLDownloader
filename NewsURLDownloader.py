@@ -14,13 +14,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 class NewsURLDownloader:
     '''下载器类，用于批量下载网页并解析内容，多进程实现'''
-    def __init__(self, urls:Union[str,List[str]], parserd_dir:str="parserd")->None:
+    def __init__(self, urls:Union[str,List[str]], parserd_dir:str="parserd",ifDownload=True)->None:
         if isinstance(urls, str):
             self.urls = [urls]
         else:
             self.urls = urls
         self.parserd_dir = parserd_dir
-        os.makedirs(self.parserd_dir, exist_ok=True)
+        self.ifDownload=ifDownload
         
     @staticmethod
     def _create_driver()->webdriver.Chrome: 
@@ -99,10 +99,20 @@ class NewsURLDownloader:
             for future in as_completed(futures):
                 res = future.result()
                 results.update(res)
+        failed_urls = [url for url, content in results.items() if "error" in content]
+        if failed_urls:
+            logging.warning(f"⚠️ 总共有 {len(failed_urls)} 个 URL 解析失败。")
+        else:
+            logging.info(f"✅ 全部URL都解析成功。")
         output_path = os.path.join(self.parserd_dir, output_file)
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(results, f, ensure_ascii=False, indent=4)
-        logging.info(f"✅ 全部数据保存完成：{output_path}")
+        if self.ifDownload:
+            os.makedirs(self.parserd_dir, exist_ok=True)
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(results, f, ensure_ascii=False, indent=4)
+            logging.info(f"✅ 全部数据保存完成：{output_path}")
+        else:
+            logging.info(f"✅ 全部数据已解析完成，已经返回")
+            return results
 
 # 测试用例
 if __name__ == "__main__":
@@ -119,7 +129,8 @@ if __name__ == "__main__":
             "https://edition.cnn.com/2022/02/25/sport/champions-league-final-russia-ukraine-sport-reaction-spt-intl/index.html",
             "https://edition.cnn.com/2022/02/25/europe/kyiv-ukraine-russian-invasion-mood-friday-intl/index.html",
             "https://edition.cnn.com/europe/live-news/ukraine-russia-news-02-23-22/index.html",
-            "https://edition.cnn.com/2022/02/23/europe/ukraine-government-commercial-organizations-data-wiping-hack/index.html"
+            "https://edition.cnn.com/2022/02/23/europe/ukraine-government-commercial-organizations-data-wiping-hack/index.html",
+            "https://edition.cnn.com/science/gallery/black-rhino-photos-c2e-spc/index.html"
             ]
     downloader = NewsURLDownloader(urls)
     downloader.download(CNNParser())

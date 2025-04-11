@@ -18,9 +18,15 @@ class BaseParser:
 class CNNParser(BaseParser):
     '''专门针对CNN新闻的解析器'''
     def parse(self):
-        time = self.soup.find('div',class_="timestamp vossi-timestamp").get_text(strip=True).replace("Published","").strip()
-        if (self.soup.find('body').get('data-page-type')=='article'):
-            title_tag = self.soup.find('h1', class_='headline__text inline-placeholder vossi-headline-text')
+        data_page_type = self.soup.find('body').get('data-page-type')
+        if (data_page_type==None):#无法处理类似于这种情况https://edition.cnn.com/interactive/2024/04/politics/trump-campaign-promises-dg/，因此将status设置为failed
+            return {
+                'url': self.url,
+                'status': "failed"
+           }
+        elif (data_page_type=='article'):
+            time = self.soup.find('div',class_=["timestamp", "vossi-timestamp"]).get_text(strip=True).replace("Published","").replace("Updated","").strip()
+            title_tag = self.soup.find('h1', class_=["headline__text", "inline-placeholder", "vossi-headline-text"])
             content_div = self.soup.find('div', class_='article__content')
             title = title_tag.get_text(strip=True) if title_tag else ''
             content = ''
@@ -32,29 +38,28 @@ class CNNParser(BaseParser):
                         content += "**"+child.get_text(strip=True)+"**"
             return {
                 'url': self.url,
+                'status': "success",
                 'title': title,
                 'time': time,
                 'content': content
             }
-        elif (self.soup.find('body').get('data-page-type')=='live-story'):
-            title_tag = self.soup.find('h1', class_='headline_live-story__text inline-placeholder vossi-headline-text')
-            title = title_tag.get_text(strip=True) if title_tag else ''
-            text_tag = self.soup.find('ul',class_="list_live-story__items list_live-story__items--ul")
-            text=""
-            for li in text_tag.children:
-                if li.name == 'li':
-                    text += li.get_text(strip=True).replace("::before","")
+        elif (data_page_type=='live-story'): #特殊的格式：live-news
+            time = self.soup.find('div',class_=["timestamp", "vossi-timestamp"]).get_text(strip=True).replace("Published","").replace("Updated","").strip()
+            title = self.soup.find('h1', class_=["headline_live-story__text", "inline-placeholder", "vossi-headline-text"]).get_text(strip=True)
+            content = self.soup.find('article',class_=["live-story-post_pinned", "liveStoryPost"]).get_text(strip=True).replace("::before","")
             posts = {
                 'url': self.url,
+                'status': "success",
                 'title': title,
-                'text': text
+                'time': time,
+                'content': content
             }
             posts_list = []
             posts_tag = self.soup.find("div",class_="live-story__items-container")
             posts_html = posts_tag.find_all("div",class_="live-story-post__wrapper")
             for post_html in posts_html:
                 time = post_html.find("time").get_text()
-                title= post_html.find("h2",class_="live-story-post__headline inline-placeholder").get_text(strip=True)
+                title= post_html.find("h2",class_=["live-story-post__headline", "inline-placeholder"]).get_text(strip=True)
                 post_content_div = post_html.find("div",class_="live-story-post__content")
                 post_content=""
                 for child in post_content_div.children:
@@ -64,12 +69,29 @@ class CNNParser(BaseParser):
                         post_content += "**"+child.get_text(strip=True)+"**"
                 post={
                     "title": title,
+                    'status': "success",
                     "time": time,
                     "content": post_content
                 }
                 posts_list.append(post)
             posts["posts"]=posts_list
             return posts
+        elif (data_page_type=="gallery"):
+            title = self.soup.find("h1",class_=["headline__text", "inline-placeholder", "vossi-headline-text"]).get_text(strip=True)
+            time = self.soup.find("div",class_=["timestamp", "vossi-timestamp"]).get_text(strip=True).replace("Published","").replace("Updated","").strip()
+            content =self.soup.find("div",class_="gallery-inline__main").get_text(strip=True)
+            return {
+                'url': self.url,
+                'status': "success",
+                'title': title,
+                'time': time,
+                'content': content
+            }
+        else: #可能存在其他未考虑到的情况
+            return {
+                'url': self.url,
+                'status': "failed"
+            }
         
 if __name__ == "__main__":
     pass
