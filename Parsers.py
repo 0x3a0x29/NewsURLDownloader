@@ -18,7 +18,7 @@ class BaseParser:
 class CNNParser(BaseParser):
     '''专门针对CNN新闻的解析器'''
     def parse(self):
-        time = self.soup.find('div',class_="timestamp vossi-timestamp").get_text(strip=True)
+        time = self.soup.find('div',class_="timestamp vossi-timestamp").get_text(strip=True).replace("Published","").strip()
         if (self.soup.find('body').get('data-page-type')=='article'):
             title_tag = self.soup.find('h1', class_='headline__text inline-placeholder vossi-headline-text')
             content_div = self.soup.find('div', class_='article__content')
