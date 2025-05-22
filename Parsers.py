@@ -33,7 +33,7 @@ class CNNParser(BaseParser):
             if content_div:
                 for child in content_div.children:
                     if child.name == 'p':
-                        content += child.get_text(strip=True).replace("::before","")
+                        content += child.get_text(strip=True).replace("::before","") + "\n"
                     if child.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
                         content += "**"+child.get_text(strip=True)+"**"
             return {
@@ -64,7 +64,7 @@ class CNNParser(BaseParser):
                 post_content=""
                 for child in post_content_div.children:
                     if child.name == 'p':
-                        post_content += child.get_text(strip=True).replace("::before","")
+                        post_content += child.get_text(strip=True).replace("::before","") + "\n"
                     if child.name in ['h3', 'h4', 'h5', 'h6']:
                         post_content += "**"+child.get_text(strip=True)+"**"
                 post={
