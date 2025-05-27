@@ -50,23 +50,41 @@ class NewsURLDownloader:
         total = len(urls)
         for i, url in enumerate(urls):
             try:
-                logging.info(f"[爬虫 {worker_id}] [{i+1}/{total}] 🔽 正在下载：{url}")
+                logging.info(f"[爬虫 {worker_id}] [{i+1}/{total}] 🔍 正在检查链接：{url}")
                 driver.get(url)
                 WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.TAG_NAME, "body"))
                 )
-                html = driver.page_source
+                final_url = driver.current_url
+                # 🔐 先判断最终跳转 URL 是否允许被抓取
                 if parser:
-                    parser.setURL(url)
+                    if not parser.url_allowed(final_url):
+                        msg = f"禁止抓取（由 robots.txt 限制）：{final_url}"
+                        logging.warning(f"[爬虫 {worker_id}] [{i+1}/{total}] ⛔ {msg}")
+                        result[url] = {
+                            'url': url,
+                            'status': "illegal"
+                        }
+                        continue
+                # ✅ 合法后再次访问以获取完整 HTML（可以跳过重复跳转，性能优化）
+                logging.info(f"[爬虫 {worker_id}] [{i+1}/{total}] 🔽 抓取允许的页面：{final_url}")
+                driver.get(final_url)
+                WebDriverWait(driver, 20).until(
+                    EC.presence_of_element_located((By.TAG_NAME, "body"))
+                )
+                html = driver.page_source
+
+                if parser:
+                    parser.setURL(final_url)
                     parser.setHTML(html)
                     parsed = parser.parse()
                     result[url] = parsed
-                    logging.info(f"[爬虫 {worker_id}] [{i+1}/{total}] 🧠 已完成解析：{url}")
+                    logging.info(f"[爬虫 {worker_id}] [{i+1}/{total}] 🧠 已完成解析：{final_url}")
                 else:
-                    result[url] = {"raw_html": html}
-                    logging.info(f"[爬虫 {worker_id}] [{i+1}/{total}] ✅ 已完成抓取：{url}")
+                    result[url] = {"raw_html": html, "final_url": final_url}
+                    logging.info(f"[爬虫 {worker_id}] [{i+1}/{total}] ✅ 已完成抓取：{final_url}")
             except Exception as e:
-                logging.warning(f"[爬虫 {worker_id}] [{i+1}/{total}] ❌ 下载失败：{url} - {e}")
+                logging.warning(f"[爬虫 {worker_id}] [{i+1}/{total}] ❌ 处理失败：{url} - {e}")
                 result[url] = {"error": str(e)}
         driver.quit()
         logging.info(f"[爬虫 {worker_id}] 🛑 已退出")
@@ -130,7 +148,8 @@ if __name__ == "__main__":
             "https://edition.cnn.com/2022/02/25/europe/kyiv-ukraine-russian-invasion-mood-friday-intl/index.html",
             "https://edition.cnn.com/europe/live-news/ukraine-russia-news-02-23-22/index.html",
             "https://edition.cnn.com/2022/02/23/europe/ukraine-government-commercial-organizations-data-wiping-hack/index.html",
-            "https://edition.cnn.com/science/gallery/black-rhino-photos-c2e-spc/index.html"
+            "https://edition.cnn.com/science/gallery/black-rhino-photos-c2e-spc/index.html",
+            "https://edition.cnn.com/profiles/anderson-cooper-profile"
             ]
     downloader = NewsURLDownloader(urls)
     downloader.download(CNNParser())

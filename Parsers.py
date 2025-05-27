@@ -1,4 +1,6 @@
 from bs4 import BeautifulSoup
+import urllib
+from urllib.parse import urlparse
 
 class BaseParser:
     '''解析器的基类'''
@@ -6,6 +8,7 @@ class BaseParser:
         self.html_content = None
         self.url = None
         self.soup = None
+        self.disallowed_urls = self.load_robots()
 
     def parse(self)->None:
         """子类应该实现这个方法，用于处理html内容"""
@@ -15,9 +18,22 @@ class BaseParser:
     def setHTML(self, html_content):
         self.html_content = html_content
         self.soup = BeautifulSoup(html_content, 'html.parser')
+    def load_robots(self):
+        return None
+    def url_allowed(self, url: str) -> bool:
+        """判断某个 URL 是否被 CNN 的 robots.txt 禁止"""
+        if len(self.disallowed_urls)==0:
+            return True
+        parsed = urlparse(url)
+        path = parsed.path
+        for disallowed in self.disallowed_urls:
+            if path.startswith(disallowed):
+                return False
+        return True
 class CNNParser(BaseParser):
     '''专门针对CNN新闻的解析器'''
     def parse(self):
+        
         data_page_type = self.soup.find('body').get('data-page-type')
         if (data_page_type==None):#无法处理类似于这种情况https://edition.cnn.com/interactive/2024/04/politics/trump-campaign-promises-dg/，因此将status设置为failed
             return {
@@ -64,7 +80,7 @@ class CNNParser(BaseParser):
                 post_content=""
                 for child in post_content_div.children:
                     if child.name == 'p':
-                        post_content += child.get_text(strip=True).replace("::before","") + "\n"
+                        post_content += child.get_text(strip=True).replace("::before","")+ "\n"
                     if child.name in ['h3', 'h4', 'h5', 'h6']:
                         post_content += "**"+child.get_text(strip=True)+"**"
                 post={
@@ -92,6 +108,20 @@ class CNNParser(BaseParser):
                 'url': self.url,
                 'status': "failed"
             }
+    def load_robots(self):
+        disallowed_paths = []
+        try:
+            with urllib.request.urlopen("https://edition.cnn.com/robots.txt", timeout=10) as response:
+                lines = response.read().decode("utf-8").splitlines()
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith("Disallow:"):
+                        path = line[len("Disallow:"):].strip()
+                        if path:
+                            disallowed_paths.append(path)
+        except Exception as e:
+            print(f"⚠️ 下载 robots.txt 失败: {e}")
+        return disallowed_paths
         
 if __name__ == "__main__":
     pass
