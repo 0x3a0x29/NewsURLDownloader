@@ -14,16 +14,17 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 class NewsURLDownloader:
     '''下载器类，用于批量下载网页并解析内容，多进程实现'''
-    def __init__(self, urls:Union[str,List[str]], parserd_dir:str="parserd",ifDownload=True)->None:
+    def __init__(self, urls:Union[str,List[str]], parserd_dir:str="parserd",ifDownload=True,user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")->None:
         if isinstance(urls, str):
             self.urls = [urls]
         else:
             self.urls = urls
         self.parserd_dir = parserd_dir
         self.ifDownload=ifDownload
+        self.user_agent=user_agent
         
     @staticmethod
-    def _create_driver()->webdriver.Chrome: 
+    def _create_driver(user_agent)->webdriver.Chrome: 
         chromedriver_path = r"driver\chromedriver.exe" #此处使用的是已经下载好的chromedriver.exe路径，需要更改为自己的路径
         service = Service(chromedriver_path) 
         options = ChromeOptions()
@@ -34,6 +35,7 @@ class NewsURLDownloader:
         options.add_argument("--ignore-certificate-errors")  #忽略 SSL 错误
         options.add_argument("--disable-infobars")
         options.add_argument("--disable-extensions")
+        options.add_argument(f'--user-agent={user_agent}')
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
         options.add_experimental_option('useAutomationExtension', False)
@@ -45,7 +47,7 @@ class NewsURLDownloader:
         return webdriver.Chrome(service=service, options=options)
     def _batch_process_worker(self, urls: List[str], worker_id: int, parser: BaseParser = None) -> dict:
         '''每个进程中运行：初始化 driver，然后批量处理一个 url 子集'''
-        driver = self._create_driver()
+        driver = self._create_driver(self.user_agent)
         result = {}
         total = len(urls)
         for i, url in enumerate(urls):

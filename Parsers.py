@@ -4,11 +4,11 @@ from urllib.parse import urlparse
 
 class BaseParser:
     '''解析器的基类'''
-    def __init__(self)->None:
+    def __init__(self, user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")->None:
         self.html_content = None
         self.url = None
-        self.soup = None
-        self.disallowed_urls = self.load_robots()
+        self.user_agent = user_agent
+        self.robots_rules = self.load_robots()
 
     def parse(self)->None:
         """子类应该实现这个方法，用于处理html内容"""
@@ -20,16 +20,19 @@ class BaseParser:
         self.soup = BeautifulSoup(html_content, 'html.parser')
     def load_robots(self):
         return None
-    def url_allowed(self, url: str) -> bool:
-        """判断某个 URL 是否被 CNN 的 robots.txt 禁止"""
-        if len(self.disallowed_urls)==0:
-            return True
+    def url_allowed(self, url: str)->bool:
         parsed = urlparse(url)
         path = parsed.path
-        for disallowed in self.disallowed_urls:
-            if path.startswith(disallowed):
-                return False
-        return True
+        allowed = True  # 默认允许
+        for directive, rule_path in self.robots_rules:
+            if rule_path == "":
+                continue
+            if path.startswith(rule_path):
+                if directive == "Disallow":
+                    allowed = False
+                elif directive == "Allow":
+                    allowed = True
+        return allowed
 class CNNParser(BaseParser):
     '''专门针对CNN新闻的解析器'''
     def parse(self):
@@ -109,19 +112,30 @@ class CNNParser(BaseParser):
                 'status': "failed"
             }
     def load_robots(self):
-        disallowed_paths = []
+        """按 user-agent 加载 robots.txt 中对应的 Allow/Disallow 规则"""
         try:
             with urllib.request.urlopen("https://edition.cnn.com/robots.txt", timeout=10) as response:
                 lines = response.read().decode("utf-8").splitlines()
-                for line in lines:
-                    line = line.strip()
-                    if line.startswith("Disallow:"):
-                        path = line[len("Disallow:"):].strip()
-                        if path:
-                            disallowed_paths.append(path)
         except Exception as e:
             print(f"⚠️ 下载 robots.txt 失败: {e}")
-        return disallowed_paths
-        
+            return []
+        rules = {}
+        current_agents = []
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.lower().startswith("user-agent:"):
+                agent = line.split(":", 1)[1].strip()
+                current_agents = [agent]
+                if agent not in rules:
+                    rules[agent] = []
+            elif line.lower().startswith(("disallow:", "allow:")):
+                directive, value = line.split(":", 1)
+                directive = directive.strip().capitalize()
+                path = value.strip()
+                for agent in current_agents:
+                    rules.setdefault(agent, []).append((directive, path))
+        return rules.get(self.user_agent, rules.get("*", []))
 if __name__ == "__main__":
     pass
