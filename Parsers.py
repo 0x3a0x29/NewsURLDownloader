@@ -52,9 +52,9 @@ class CNNParser(BaseParser):
             if content_div:
                 for child in content_div.children:
                     if child.name == 'p':
-                        content += child.get_text(strip=True).replace("::before","") + "\n"
+                        content += child.get_text().replace("::before","") + "\n"
                     if child.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-                        content += "**"+child.get_text(strip=True)+"**"
+                        content += "**"+child.get_text()+"**"
             return {
                 'url': self.url,
                 'status': "success",
@@ -65,7 +65,7 @@ class CNNParser(BaseParser):
         elif (data_page_type=='live-story'): #特殊的格式：live-news
             time = self.soup.find('div',class_=["timestamp", "vossi-timestamp"]).get_text(strip=True).replace("Published","").replace("Updated","").strip()
             title = self.soup.find('h1', class_=["headline_live-story__text", "inline-placeholder", "vossi-headline-text"]).get_text(strip=True)
-            content = self.soup.find('article',class_=["live-story-post_pinned", "liveStoryPost"]).get_text(strip=True).replace("::before","")
+            content = self.soup.find('article',class_=["live-story-post_pinned", "liveStoryPost"]).get_text().replace("::before","")
             posts = {
                 'url': self.url,
                 'status': "success",
@@ -83,9 +83,9 @@ class CNNParser(BaseParser):
                 post_content=""
                 for child in post_content_div.children:
                     if child.name == 'p':
-                        post_content += child.get_text(strip=True).replace("::before","")+ "\n"
+                        post_content += child.get_text().replace("::before","")+ "\n"
                     if child.name in ['h3', 'h4', 'h5', 'h6']:
-                        post_content += "**"+child.get_text(strip=True)+"**"
+                        post_content += "**"+child.get_text()+"**"
                 post={
                     "title": title,
                     'status': "success",
@@ -98,7 +98,7 @@ class CNNParser(BaseParser):
         elif (data_page_type=="gallery"):
             title = self.soup.find("h1",class_=["headline__text", "inline-placeholder", "vossi-headline-text"]).get_text(strip=True)
             time = self.soup.find("div",class_=["timestamp", "vossi-timestamp"]).get_text(strip=True).replace("Published","").replace("Updated","").strip()
-            content =self.soup.find("div",class_="gallery-inline__main").get_text(strip=True)
+            content =self.soup.find("div",class_="gallery-inline__main").get_text()
             return {
                 'url': self.url,
                 'status': "success",
